@@ -23,10 +23,16 @@ spec:
           type: object
         spec:
           properties:
-            poolName:
+            accessToken:
+              type: string
+            agentPool:
+              type: string
+            serverURL:
               type: string
           required:
-          - poolName
+          - serverURL
+          - accessToken
+          - agentPool
           type: object
         status:
           type: object

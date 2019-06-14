@@ -3,4 +3,6 @@ kind: AzureAgentPool
 metadata:
   name: example-azureagentpool
 spec:
-  poolName: MyPool
+  serverURL: https://dev.azure.com/szetibalazs
+  accessToken: ...
+  agentPool: MyPool

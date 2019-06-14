@@ -98,7 +98,7 @@ func (r *ReconcileAzureAgentPool) Reconcile(request reconcile.Request) (reconcil
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	reqLogger.Info("AzureAgentPool", "Name", instance.Name, "spec.PoolName", instance.Spec.PoolName)
+	reqLogger.Info("AzureAgentPool", "ServerURL", instance.Spec.ServerURL, "AgentPool", instance.Spec.AgentPool)
 
 	// // Define a new Pod object
 	// pod := newPodForCR(instance)

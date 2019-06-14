@@ -14,7 +14,9 @@ type AzureAgentPoolSpec struct {
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
 
-	PoolName string `json:"poolName"`
+	ServerURL   string `json:"serverURL"`
+	AccessToken string `json:"accessToken"`
+	AgentPool   string `json:"agentPool"`
 }
 
 // AzureAgentPoolStatus defines the observed state of AzureAgentPool
