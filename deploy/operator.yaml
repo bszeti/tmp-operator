@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-agent-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: azure-agent-operator
+  template:
+    metadata:
+      labels:
+        name: azure-agent-operator
+    spec:
+      serviceAccountName: azure-agent-operator
+      containers:
+        - name: azure-agent-operator
+          # Replace this with the built image name
+          image: REPLACE_IMAGE
+          command:
+          - azure-agent-operator
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "azure-agent-operator"
