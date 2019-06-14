@@ -14,7 +14,8 @@ type AzureAgentPoolSpec struct {
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
 
-	ServerURL   string `json:"serverURL"`
+	Account     string `json:"account"`
+	Project     string `json:"project"`
 	AccessToken string `json:"accessToken"`
 	AgentPool   string `json:"agentPool"`
 }

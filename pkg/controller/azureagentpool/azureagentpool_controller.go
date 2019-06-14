@@ -17,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/benmatselby/go-azuredevops/azuredevops"
 )
 
 var log = logf.Log.WithName("controller_azureagentpool")
@@ -98,7 +100,18 @@ func (r *ReconcileAzureAgentPool) Reconcile(request reconcile.Request) (reconcil
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	reqLogger.Info("AzureAgentPool", "ServerURL", instance.Spec.ServerURL, "AgentPool", instance.Spec.AgentPool)
+	reqLogger.Info("AzureAgentPool", "Account", instance.Spec.Account, "Project", instance.Spec.Project, "AgentPool", instance.Spec.AgentPool)
+
+	v := azuredevops.NewClient("szetibalazs", "szetibalazs", instance.Spec.AccessToken)
+	builds, err := v.Builds.List(&azuredevops.BuildsListOptions{})
+	if err != nil {
+		reqLogger.Info("Error", "err", err.Error())
+		return reconcile.Result{}, err
+	}
+	reqLogger.Info("Builds", "len", len(builds))
+	for _, b := range builds {
+		reqLogger.Info("Build", "BuildNumber", b.BuildNumber, "Status", b.Status, "Name", b.Definition.Name)
+	}
 
 	// // Define a new Pod object
 	// pod := newPodForCR(instance)

@@ -25,12 +25,15 @@ spec:
           properties:
             accessToken:
               type: string
+            account:
+              type: string
             agentPool:
               type: string
-            serverURL:
+            project:
               type: string
           required:
-          - serverURL
+          - account
+          - project
           - accessToken
           - agentPool
           type: object

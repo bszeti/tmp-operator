@@ -68,7 +68,13 @@ func schema_pkg_apis_devops_v1alpha1_AzureAgentPoolSpec(ref common.ReferenceCall
 			SchemaProps: spec.SchemaProps{
 				Description: "AzureAgentPoolSpec defines the desired state of AzureAgentPool",
 				Properties: map[string]spec.Schema{
-					"serverURL": {
+					"account": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"project": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",
@@ -87,7 +93,7 @@ func schema_pkg_apis_devops_v1alpha1_AzureAgentPoolSpec(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"serverURL", "accessToken", "agentPool"},
+				Required: []string{"account", "project", "accessToken", "agentPool"},
 			},
 		},
 		Dependencies: []string{},
