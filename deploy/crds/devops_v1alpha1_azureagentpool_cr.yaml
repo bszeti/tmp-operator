@@ -3,5 +3,4 @@ kind: AzureAgentPool
 metadata:
   name: example-azureagentpool
 spec:
-  # Add fields here
-  size: 3
+  poolName: MyPool
