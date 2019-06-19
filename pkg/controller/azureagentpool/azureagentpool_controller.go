@@ -2,14 +2,15 @@ package azureagentpool
 
 import (
 	"context"
-	"time"
 	"strconv"
+	"time"
 
 	devopsv1alpha1 "github.com/redhat/azure-agent-operator/pkg/apis/devops/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -138,21 +139,18 @@ func (r *ReconcileAzureAgentPool) Reconcile(request reconcile.Request) (reconcil
 	//Project specific client
 	v := azuredevops.NewClient(instance.Spec.Account, instance.Spec.Project, instance.Spec.AccessToken)
 
-
 	//TODO: TEMP - Log all builds;
-	allbuilds, err := v.Builds.List(&azuredevops.BuildsListOptions{})
-	if err != nil {
-		reqLogger.Info("Error", "err", err.Error())
-		return reconcile.Result{RequeueAfter: period}, err
-	}
-	reqLogger.Info("AllBuilds", "len", len(allbuilds))
-	for _, b := range allbuilds {
-		reqLogger.Info("AllBuild", "BuildNumber", b.BuildNumber, "Id", b.ID, "Status", b.Status, "Name", b.Definition.Name)
-	}
+	// allbuilds, err := v.Builds.List(&azuredevops.BuildsListOptions{})
+	// if err != nil {
+	// 	reqLogger.Info("Error", "err", err.Error())
+	// 	return reconcile.Result{RequeueAfter: period}, err
+	// }
+	// reqLogger.Info("AllBuilds", "len", len(allbuilds))
+	// for _, b := range allbuilds {
+	// 	reqLogger.Info("AllBuild", "BuildNumber", b.BuildNumber, "Id", b.ID, "Status", b.Status, "Name", b.Definition.Name)
+	// }
 
-
-
-	//Query builds with status "inProgress" in the projects
+	// Query builds with status "inProgress" in the projects
 	builds, err := v.Builds.List(&azuredevops.BuildsListOptions{
 		Status: "inProgress",
 	})
@@ -161,13 +159,13 @@ func (r *ReconcileAzureAgentPool) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{RequeueAfter: period}, err
 	}
 
-	//Check each build if they have a pod created
+	// Check each build if they have a pod created
 	reqLogger.Info("Pending builds", "len", len(builds))
 	for _, b := range builds {
 		reqLogger.Info("Build", "BuildNumber", b.BuildNumber, "Id", b.ID, "Status", b.Status, "Name", b.Definition.Name)
 
 		// Define a new Pod object
-		pod := podForBuild(&b,instance)
+		pod := podForBuild(&b, instance)
 		if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
 			return reconcile.Result{RequeueAfter: period}, err
 		}
@@ -178,47 +176,50 @@ func (r *ReconcileAzureAgentPool) Reconcile(request reconcile.Request) (reconcil
 		if err != nil {
 			if errors.IsNotFound(err) {
 				reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-			
-				//Create Pod, ignore is already exists
+
+				// Create Pod, ignore is already exists
 				err = r.client.Create(context.TODO(), pod)
 				if err != nil {
 					return reconcile.Result{RequeueAfter: period}, err
 				}
 
-			} else { //Other error than "NotFound"
+			} else { // Other error than "NotFound"
 				return reconcile.Result{RequeueAfter: period}, err
 			}
 		}
 	}
 
-	//Look for pods and if build is completed then delete the Pod and agent.
+	// Look for pods and if build is completed then delete the Pod and agent.
+	// List all pods owned by this AzureAgentPool instance
+	podList := &corev1.PodList{}
+	labelSelector := labels.SelectorFromSet(
+		map[string]string{
+			"devops.example.com/azure-agent-pool": instance.Name,
+		})
+	listOps := &client.ListOptions{Namespace: instance.Namespace, LabelSelector: labelSelector}
+	if err = r.client.List(context.TODO(), listOps, podList); err != nil {
+		return reconcile.Result{}, err
+	}
 
-	
+	// Check if pod has a matching build, delete otherwise
+	for _, pod := range podList.Items {
+		reqLogger.Info("Pod", "Name", pod.Name, "Phase", pod.Status.Phase)
+		if pod.ObjectMeta.DeletionTimestamp != nil {
+			continue
+		}
+		buildid := pod.Labels["devops.example.com/buildid"]
+		found := false
+		for _, b := range builds {
+			if strconv.Itoa(b.ID) == buildid {
+				found = true
+			}
+		}
+		if !found {
+			r.client.Delete(context.TODO(), &pod)
+		}
+	}
 
-	// // Set AzureAgentPool instance as the owner and controller
-	// if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
-	// 	return reconcile.Result{}, err
-	// }
-
-	// // Check if this Pod already exists
-	// found := &corev1.Pod{}
-	// err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
-	// if err != nil && errors.IsNotFound(err) {
-	// 	reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-	// 	err = r.client.Create(context.TODO(), pod)
-	// 	if err != nil {
-	// 		return reconcile.Result{}, err
-	// 	}
-
-	// 	// Pod created successfully - don't requeue
-	// 	return reconcile.Result{}, nil
-	// } else if err != nil {
-	// 	return reconcile.Result{}, err
-	// }
-
-	// // Pod already exists - don't requeue
-	// reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
-	// return reconcile.Result{}, nil
+	//TODO: Delete agent from Azure Pool; Or let the agent deregister with postHook (what happens is kubernetes moves the pod?)
 
 	//Try priodic reconcile
 	return reconcile.Result{RequeueAfter: period}, nil
@@ -267,12 +268,16 @@ func newMainAgentForPool(cr *devopsv1alpha1.AzureAgentPool) *corev1.Pod {
 	}
 }
 
-
 func podForBuild(build *azuredevops.Build, cr *devopsv1alpha1.AzureAgentPool) *corev1.Pod {
 	labels := map[string]string{
-		"azureagentpool": cr.Name,
-		"buildid": strconv.Itoa(build.ID),
+		"devops.example.com/azure-agent-pool": cr.Name,
+		"devops.example.com/buildid":          strconv.Itoa(build.ID),
 	}
+	//Should not use annotations because the ListOptions doesn't support annotations
+	// annotations := map[string]string{
+	// 	"devops.example.com/azure-agent-pool": cr.Name,
+	// 	"devops.example.com/buildid": strconv.Itoa(build.ID),
+	// }
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "agent-" + cr.Name + "-kubernetes-build-" + strconv.Itoa(build.ID),
@@ -303,11 +308,16 @@ func podForBuild(build *azuredevops.Build, cr *devopsv1alpha1.AzureAgentPool) *c
 						},
 						{
 							Name:  "KUBERNETES_AGENT_TYPE",
-							Value: "main",
+							Value: "java",
 						},
 						{
-							Name:  "BUILD_BUILDID",
-							Value: strconv.Itoa(build.ID),
+							Name: "BUILD_BUILDID",
+							ValueFrom: &corev1.EnvVarSource{
+								FieldRef: &corev1.ObjectFieldSelector{
+									FieldPath: "metadata.labels['devops.example.com/buildid']",
+								},
+							},
+							//Value: strconv.Itoa(build.ID),
 						},
 					},
 				},
